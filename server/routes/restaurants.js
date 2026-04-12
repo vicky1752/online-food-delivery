@@ -2,10 +2,39 @@ const express = require('express');
 const pool = require('../config/db');
 const router = express.Router();
 
-// GET /api/restaurants
+// GET /api/restaurants?search=name&cuisine=Indian
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM restaurants WHERE is_open = TRUE');
+    const { search, cuisine } = req.query;
+
+    let query = 'SELECT * FROM restaurants WHERE is_open = TRUE';
+    const params = [];
+
+    if (cuisine && cuisine !== 'All') {
+      query += ' AND cuisine = ?';
+      params.push(cuisine);
+    }
+
+    if (search && search.trim()) {
+      query += ' AND (name LIKE ? OR cuisine LIKE ?)';
+      const term = `%${search.trim()}%`;
+      params.push(term, term);
+    }
+
+    query += ' ORDER BY rating DESC';
+
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /restaurants error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/restaurants/all — include closed ones (for admin/seed check)
+router.get('/all', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM restaurants ORDER BY rating DESC');
     res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -27,7 +56,7 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/menu', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM menu_items WHERE restaurant_id = ? AND available = TRUE',
+      'SELECT * FROM menu_items WHERE restaurant_id = ? AND available = TRUE ORDER BY category, name',
       [req.params.id]
     );
     res.json(rows);

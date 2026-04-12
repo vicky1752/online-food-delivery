@@ -4,11 +4,19 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import toast from 'react-hot-toast'
 
+const ROLES = [
+  { key: 'customer',    label: 'Customer',    emoji: '👤', desc: 'Order food from restaurants',      color: '#ff5252' },
+  { key: 'restaurant',  label: 'Shopkeeper',  emoji: '🏪', desc: 'Manage your restaurant & orders', color: '#ff9800' },
+  { key: 'delivery',    label: 'Driver',      emoji: '🛵', desc: 'View & deliver assigned orders',  color: '#4caf50' },
+]
+
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'customer' })
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  const selectedRole = ROLES.find(r => r.key === form.role)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -18,9 +26,12 @@ export default function Register() {
       const res = await api.post('/auth/register', form)
       login(res.data.token, res.data.user)
       toast.success(`Account created! Welcome, ${res.data.user.name}! 🎉`)
-      navigate('/')
+      // Redirect based on role
+      if (res.data.user.role === 'restaurant') navigate('/shopkeeper')
+      else if (res.data.user.role === 'delivery') navigate('/driver')
+      else navigate('/')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed')
+      toast.error(err.response?.data?.message || 'Registration failed — is the server running?')
     } finally {
       setLoading(false)
     }
@@ -34,6 +45,40 @@ export default function Register() {
         </div>
         <h1 className="auth-title">Create account</h1>
         <p className="auth-subtitle">Join thousands of food lovers today</p>
+
+        {/* Role Selector */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+          {ROLES.map(role => (
+            <button
+              key={role.key}
+              id={`register-role-${role.key}`}
+              type="button"
+              onClick={() => setForm({ ...form, role: role.key })}
+              style={{
+                padding: '12px 8px',
+                borderRadius: 'var(--radius-sm)',
+                border: `2px solid ${form.role === role.key ? role.color : 'var(--border)'}`,
+                background: form.role === role.key ? `${role.color}15` : 'var(--bg-card2)',
+                color: form.role === role.key ? role.color : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'var(--transition)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.6rem', marginBottom: 4 }}>{role.emoji}</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{role.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Role description */}
+        <div style={{
+          padding: '10px 14px', borderRadius: 'var(--radius-xs)',
+          background: `${selectedRole.color}10`, border: `1px solid ${selectedRole.color}30`,
+          fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 20
+        }}>
+          {selectedRole.emoji} <strong style={{ color: selectedRole.color }}>{selectedRole.label}:</strong> {selectedRole.desc}
+        </div>
 
         <form className="auth-form" onSubmit={handleSubmit} id="register-form">
           <div className="form-group">
@@ -87,10 +132,13 @@ export default function Register() {
             id="register-submit"
             type="submit"
             className="btn btn-primary btn-lg"
-            style={{ width: '100%', marginTop: '8px' }}
+            style={{
+              width: '100%', marginTop: '8px',
+              background: `linear-gradient(135deg, ${selectedRole.color}, ${selectedRole.color}cc)`
+            }}
             disabled={loading}
           >
-            {loading ? '⏳ Creating account...' : '🚀 Create Account'}
+            {loading ? '⏳ Creating account...' : `${selectedRole.emoji} Create Account as ${selectedRole.label}`}
           </button>
         </form>
 
