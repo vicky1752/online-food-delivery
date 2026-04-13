@@ -24,6 +24,28 @@ router.get('/profile', auth, mustBeDriver, async (req, res) => {
   }
 });
 
+// POST /api/driver/profile
+// Create a new driver profile
+router.post('/profile', auth, mustBeDriver, async (req, res) => {
+  const { phone } = req.body; // or get from user record
+
+  try {
+    const [existing] = await pool.query('SELECT agent_id FROM delivery_agents WHERE user_id = ?', [req.user.user_id]);
+    if (existing.length > 0) return res.status(400).json({ message: 'Profile already exists' });
+
+    // use the name from user table/token
+    const [user] = await pool.query('SELECT name, phone FROM users WHERE user_id = ?', [req.user.user_id]);
+    
+    await pool.query(
+      'INSERT INTO delivery_agents (user_id, name, phone, available) VALUES (?, ?, ?, ?)',
+      [req.user.user_id, user[0].name, phone || user[0].phone || '0000000000', false]
+    );
+    res.status(201).json({ message: 'Profile created' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // GET /api/driver/deliveries
 // All deliveries assigned to this driver
 router.get('/deliveries', auth, mustBeDriver, async (req, res) => {

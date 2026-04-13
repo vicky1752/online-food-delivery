@@ -13,23 +13,41 @@ export default function DriverDashboard() {
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState(null)
   const [activeTab, setActiveTab] = useState('active')
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [setupData, setSetupData] = useState({ phone: '' })
 
   const fetchAll = async () => {
     try {
-      const [profRes, delRes] = await Promise.all([
-        api.get('/driver/profile'),
-        api.get('/driver/deliveries'),
-      ])
-      setProfile(profRes.data)
-      setDeliveries(delRes.data.deliveries)
+      setLoading(true);
+      const profRes = await api.get('/driver/profile');
+      setProfile(profRes.data);
+      setNeedsSetup(false);
+
+      const delRes = await api.get('/driver/deliveries');
+      setDeliveries(delRes.data.deliveries || []);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load driver dashboard')
+      if (err.response?.status === 404) {
+        setNeedsSetup(true);
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to load driver dashboard');
+      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   useEffect(() => { fetchAll() }, [])
+
+  const handleSetupSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/driver/profile', setupData);
+      toast.success('Profile created successfully!');
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create profile');
+    }
+  };
 
   const handleStatusUpdate = async (delivery_id, newStatus) => {
     setUpdatingId(delivery_id)
@@ -56,6 +74,25 @@ export default function DriverDashboard() {
   const pastDeliveries   = deliveries.filter(d => d.status === 'delivered')
 
   if (loading) return <div className="loading-spinner" style={{ paddingTop: '120px' }}><div className="spinner" /></div>
+
+  if (needsSetup) {
+    return (
+      <div className="page-wrapper page-enter">
+        <div className="container" style={{ maxWidth: 500, paddingTop: '100px' }}>
+          <div className="card" style={{ padding: '30px' }}>
+            <h2 style={{ marginBottom: 20 }}>Setup Driver Profile</h2>
+            <form onSubmit={handleSetupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 5 }}>Contact Number (Optional)</label>
+                <input type="text" className="form-input" placeholder="e.g. 9876543210 (Leave blank to use account phone)" value={setupData.phone} onChange={e => setSetupData({...setupData, phone: e.target.value})} />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: 10 }}>Complete Setup</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-wrapper page-enter">

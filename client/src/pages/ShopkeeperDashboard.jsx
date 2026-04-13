@@ -15,30 +15,75 @@ export default function ShopkeeperDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('orders')
   const [updatingId, setUpdatingId] = useState(null)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [setupData, setSetupData] = useState({ name: '', cuisine: '', address: '', image_url: '' })
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [editData, setEditData] = useState({ name: '', cuisine: '', image_url: '' })
+  const [addingItem, setAddingItem] = useState(false)
+  const [newItem, setNewItem] = useState({ name: '', description: '', price: '', category: '', image_url: '' })
   const navigate = useNavigate()
 
   const fetchAll = async () => {
     try {
-      const [restRes, ordersRes, menuRes] = await Promise.all([
-        api.get('/shopkeeper/my-restaurant'),
+      setLoading(true);
+      const restRes = await api.get('/shopkeeper/my-restaurant');
+      setRestaurant(restRes.data);
+      setNeedsSetup(false);
+
+      const [ordersRes, menuRes] = await Promise.all([
         api.get('/shopkeeper/orders'),
         api.get('/shopkeeper/menu'),
-      ])
-      setRestaurant(restRes.data)
-      setOrders(ordersRes.data.orders)
-      setMenuItems(menuRes.data)
+      ]);
+      setOrders(ordersRes.data.orders || []);
+      setMenuItems(menuRes.data || []);
     } catch (err) {
       if (err.response?.status === 404) {
-        toast.error('No restaurant linked to your account')
+        setNeedsSetup(true);
       } else {
-        toast.error('Failed to load dashboard')
+        toast.error('Failed to load dashboard');
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   useEffect(() => { fetchAll() }, [])
+
+  const handleSetupSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/shopkeeper/restaurant', setupData);
+      toast.success('Restaurant created successfully!');
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create restaurant');
+    }
+  };
+
+  const handleEditProfile = async (e) => {
+    e.preventDefault();
+    try {
+      await api.patch('/shopkeeper/my-restaurant', editData);
+      toast.success('Profile updated successfully!');
+      setIsEditingProfile(false);
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update profile');
+    }
+  };
+
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/shopkeeper/menu', newItem);
+      toast.success('Menu item added!');
+      setAddingItem(false);
+      setNewItem({ name: '', description: '', price: '', category: '', image_url: '' });
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add item');
+    }
+  };
 
   const handleStatusUpdate = async (order_id, newStatus) => {
     setUpdatingId(order_id)
@@ -68,10 +113,41 @@ export default function ShopkeeperDashboard() {
     } catch { toast.error('Failed to toggle item') }
   }
 
-  const activeOrders = orders.filter(o => o.status !== 'delivered')
-  const pastOrders   = orders.filter(o => o.status === 'delivered')
+  const activeOrders = orders.filter(o => o.status !== 'delivered');
+  const pastOrders   = orders.filter(o => o.status === 'delivered');
 
   if (loading) return <div className="loading-spinner" style={{ paddingTop: '120px' }}><div className="spinner" /></div>
+
+  if (needsSetup) {
+    return (
+      <div className="page-wrapper page-enter">
+        <div className="container" style={{ maxWidth: 500, paddingTop: '100px' }}>
+          <div className="card" style={{ padding: '30px' }}>
+            <h2 style={{ marginBottom: 20 }}>Setup Your Restaurant</h2>
+            <form onSubmit={handleSetupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 5 }}>Restaurant Name *</label>
+                <input type="text" className="form-input" required value={setupData.name} onChange={e => setSetupData({...setupData, name: e.target.value})} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 5 }}>Cuisine Type *</label>
+                <input type="text" className="form-input" required placeholder="e.g. Italian, Indian, Fast Food" value={setupData.cuisine} onChange={e => setSetupData({...setupData, cuisine: e.target.value})} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 5 }}>Address</label>
+                <input type="text" className="form-input" value={setupData.address} onChange={e => setSetupData({...setupData, address: e.target.value})} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 5 }}>Image URL</label>
+                <input type="text" className="form-input" placeholder="https://..." value={setupData.image_url} onChange={e => setSetupData({...setupData, image_url: e.target.value})} />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: 10 }}>Create Restaurant</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-wrapper page-enter">
@@ -85,7 +161,10 @@ export default function ShopkeeperDashboard() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem'
             }}>🏪</div>
             <div>
-              <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 2 }}>{restaurant?.name}</h1>
+              <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: 2 }}>
+                {restaurant?.name}
+                <button onClick={() => { setIsEditingProfile(true); setEditData({ name: restaurant?.name, cuisine: restaurant?.cuisine, image_url: restaurant?.image_url || '' }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', marginLeft: '10px' }}>✏️</button>
+              </h1>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>🍴 {restaurant?.cuisine}</span>
                 <span className="rating-pill">⭐ {Number(restaurant?.rating).toFixed(1)}</span>
@@ -138,6 +217,22 @@ export default function ShopkeeperDashboard() {
           ))}
         </div>
 
+        {/* Edit Profile Modal inline equivalent */}
+        {isEditingProfile && (
+          <div className="card" style={{ padding: '20px', marginBottom: '24px', borderLeft: '4px solid #2196f3' }}>
+            <h3 style={{ marginBottom: 16 }}>Edit Profile</h3>
+            <form onSubmit={handleEditProfile} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input type="text" className="form-input" placeholder="Restaurant Name" value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} />
+              <input type="text" className="form-input" placeholder="Cuisine Type" value={editData.cuisine} onChange={e => setEditData({...editData, cuisine: e.target.value})} />
+              <input type="text" className="form-input" placeholder="Image URL" value={editData.image_url} onChange={e => setEditData({...editData, image_url: e.target.value})} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Changes</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsEditingProfile(false)} style={{ flex: 1, border: '1px solid var(--border)' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Active Orders */}
         {activeTab === 'orders' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -152,6 +247,14 @@ export default function ShopkeeperDashboard() {
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       📞 {order.customer_phone} · {new Date(order.created_at).toLocaleTimeString('en-IN')}
+                    </div>
+                    {/* Driver Status Indicator */}
+                    <div style={{ marginTop: 4, fontSize: '0.8rem', fontWeight: 600 }}>
+                      {order.agent_id ? (
+                        <span style={{ color: '#2196f3' }}>🛵 Driver assigned: {order.agent_name}</span>
+                      ) : (
+                        <span style={{ color: '#f44336' }}>⏳ Driver pending</span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -214,6 +317,32 @@ export default function ShopkeeperDashboard() {
         {/* Menu Management */}
         {activeTab === 'menu' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Add Item Button & Form */}
+            {!addingItem ? (
+              <button 
+                className="btn btn-primary" 
+                onClick={() => setAddingItem(true)} 
+                style={{ alignSelf: 'flex-start', marginBottom: 10, background: '#4caf50' }}
+              >
+                + Add New Item
+              </button>
+            ) : (
+              <div className="card" style={{ padding: 20, marginBottom: 10, borderLeft: '4px solid #ff9800' }}>
+                <h3 style={{ marginBottom: 12 }}>Add Menu Item</h3>
+                <form onSubmit={handleAddItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ gridColumn: '1 / -1' }}><input type="text" className="form-input" placeholder="Item Name *" required value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})}/></div>
+                  <div><input type="number" step="0.01" className="form-input" placeholder="Price (₹) *" required value={newItem.price} onChange={e=>setNewItem({...newItem, price: e.target.value})}/></div>
+                  <div><input type="text" className="form-input" placeholder="Category (e.g. Starter)" value={newItem.category} onChange={e=>setNewItem({...newItem, category: e.target.value})}/></div>
+                  <div style={{ gridColumn: '1 / -1' }}><input type="text" className="form-input" placeholder="Description" value={newItem.description} onChange={e=>setNewItem({...newItem, description: e.target.value})}/></div>
+                  <div style={{ gridColumn: '1 / -1' }}><input type="text" className="form-input" placeholder="Image URL" value={newItem.image_url} onChange={e=>setNewItem({...newItem, image_url: e.target.value})}/></div>
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, marginTop: 4 }}>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Item</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => setAddingItem(false)} style={{ flex: 1, border: '1px solid var(--border)' }}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
             {menuItems.map(item => (
               <div key={item.item_id} className="card" style={{
                 padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16,
