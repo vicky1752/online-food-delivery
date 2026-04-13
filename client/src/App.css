@@ -19,6 +19,7 @@
 
 .hero {
   position: relative;
+  isolation: isolate;
 
   .base,
   .framework,
@@ -33,10 +34,10 @@
     z-index: 0;
   }
 
-  .framework,
+   .framework,
   .vite {
     position: absolute;
-  }
+  } 
 
   .framework {
     z-index: 1;
@@ -181,4 +182,20 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+
+.hero-search {
+  position: relative;
+  z-index: 10;
+}
+
+.hero .framework,
+.hero .vite {
+  pointer-events: none;
+}
+
+.hero-search-input {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 999;
 }

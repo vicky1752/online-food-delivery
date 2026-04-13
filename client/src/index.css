@@ -696,6 +696,8 @@ input, textarea { font-family: inherit; }
   width: 200%; height: 200%;
   background: radial-gradient(ellipse, rgba(255,82,82,0.03) 0%, transparent 60%);
   animation: hero-glow 8s ease-in-out infinite alternate;
+
+   pointer-events: none; /* ← add this */
 }
 
 @keyframes hero-glow {

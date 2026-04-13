@@ -108,22 +108,48 @@ export default function Home() {
   const [usingDummy, setUsingDummy] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    api.get('/restaurants')
-      .then(r => {
-        const data = r.data && r.data.length > 0 ? r.data : DUMMY_RESTAURANTS
-        if (r.data && r.data.length === 0) setUsingDummy(true)
-        setRestaurants(data)
-        setFiltered(data)
-      })
-      .catch(() => {
-        // Fallback to dummy data when server is unreachable
-        setUsingDummy(true)
-        setRestaurants(DUMMY_RESTAURANTS)
-        setFiltered(DUMMY_RESTAURANTS)
-      })
-      .finally(() => setLoading(false))
-  }, [])
+  // useEffect(() => {
+  //   api.get('/restaurants')
+  //     .then(r => {
+  //       const data = r.data && r.data.length > 0 ? r.data : DUMMY_RESTAURANTS
+  //       if (r.data && r.data.length === 0) setUsingDummy(true)
+  //       setRestaurants(data)
+  //       setFiltered(data)
+  //     })
+  //     .catch(() => {
+  //       // Fallback to dummy data when server is unreachable
+  //       setUsingDummy(true)
+  //       setRestaurants(DUMMY_RESTAURANTS)
+  //       setFiltered(DUMMY_RESTAURANTS)
+  //     })
+  //     .finally(() => setLoading(false))
+  // }, [])
+
+
+useEffect(() => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000) // 5s timeout
+
+  api.get('/restaurants', { signal: controller.signal })
+    .then(r => {
+      const data = r.data?.restaurants ?? r.data
+      const list = data && data.length > 0 ? data : DUMMY_RESTAURANTS
+      if (!data || data.length === 0) setUsingDummy(true)
+      setRestaurants(list)
+      setFiltered(list)
+    })
+    .catch(() => {
+      setUsingDummy(true)
+      setRestaurants(DUMMY_RESTAURANTS)
+      setFiltered(DUMMY_RESTAURANTS)
+    })
+    .finally(() => {
+      clearTimeout(timeout)
+      setLoading(false)
+    })
+}, [])
+
+
 
   // Live filtering whenever search text or cuisine changes
   useEffect(() => {
